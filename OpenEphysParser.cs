@@ -166,6 +166,14 @@ namespace PSTH
         public bool SortedSpikeOnly { get; set; } = false;
 
         /// <summary>
+        /// If the sample number in the original data is used to generate the timestamp.
+        /// This is useful when you don't have to sync with external data.
+        /// </summary>
+        [Description("If the sample number in the original data is used to generate the timestamp. " +
+                     "This is useful when you don't have to sync with external data.")]
+        public bool UseOriginalTimestamp { get; set; } = true;
+
+        /// <summary>
         /// Converts message from ZMQInterface Plugin of OpenEphys to OpenEphysData
         /// </summary>
         /// <param name="source">The source sequence from an ZeroMQ Source</param>
@@ -195,8 +203,9 @@ namespace PSTH
                     startTimeSet = true;
                 }
 
-                //var timeStamp = startTime + TimeSpan.FromSeconds((double)sampleNumber / SamplingRate);
-                var timeStamp = HighResolutionScheduler.Now;
+                var timeStamp = UseOriginalTimestamp
+                    ? startTime + TimeSpan.FromSeconds((double) sampleNumber / SamplingRate)
+                    : HighResolutionScheduler.Now;
                 ushort sampleCount;
                 Mat data;
                 switch (type.ToString())
