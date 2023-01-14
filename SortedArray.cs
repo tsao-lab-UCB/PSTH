@@ -88,5 +88,10 @@ namespace PSTH
         {
             return _list.ToArray();
         }
+
+        public SortedArray<T> Clone()
+        {
+            return new SortedArray<T>(_list);
+        }
     }
 }

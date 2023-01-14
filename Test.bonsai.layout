@@ -149,8 +149,8 @@
   <DialogSettings xsi:type="WorkflowEditorSettings">
     <Visible>true</Visible>
     <Location>
-      <X>1322</X>
-      <Y>402</Y>
+      <X>985</X>
+      <Y>578</Y>
     </Location>
     <Size>
       <Width>413</Width>
@@ -161,9 +161,9 @@
     <VisualizerSettings>
       <MatVisualizer>
         <XMin>0</XMin>
-        <XMax>1</XMax>
+        <XMax>1000</XMax>
         <YMin>0</YMin>
-        <YMax>1.1</YMax>
+        <YMax>70</YMax>
         <AutoScaleX>true</AutoScaleX>
         <AutoScaleY>true</AutoScaleY>
         <SelectedPage>0</SelectedPage>

@@ -153,25 +153,28 @@ namespace PSTH
                      "It's automatically updated if the message contains continuous data.")]
         public ushort SamplingRate { get; set; } = 25000;
 
-        /// <summary>
-        /// Optional filter for the desired datatype. Null means no filtering
-        /// </summary>
-        [Description("Optional filter for the desired datatype. Null means no filtering")]
-        public DataType? Type { get; set; } = null;
+        ///// <summary>
+        ///// Optional filter for the desired datatype. Null means no filtering
+        ///// </summary>
+        //[Obsolete, Browsable(false)]
+        //[Description("Optional filter for the desired datatype. Null means no filtering")]
+        //public DataType? Type { get; set; } = null;
 
-        /// <summary>
-        /// If unsorted spikes with SortedId = 0 are discarded
-        /// </summary>
-        [Description("If unsorted spikes with SortedId = 0 are discarded")]
-        public bool SortedSpikeOnly { get; set; } = false;
+        ///// <summary>
+        ///// If unsorted spikes with SortedId = 0 are discarded
+        ///// </summary>
+        //[Obsolete, Browsable(false)]
+        //[Description("If unsorted spikes with SortedId = 0 are discarded")]
+        //public bool SortedSpikeOnly { get; set; } = false;
 
-        /// <summary>
-        /// If the sample number in the original data is used to generate the timestamp.
-        /// This is useful when you don't have to sync with external data.
-        /// </summary>
-        [Description("If the sample number in the original data is used to generate the timestamp. " +
-                     "This is useful when you don't have to sync with external data.")]
-        public bool UseOriginalTimestamp { get; set; } = true;
+        ///// <summary>
+        ///// If the sample number in the original data is used to generate the timestamp.
+        ///// This is useful when you don't have to sync with external data.
+        ///// </summary>
+        //[Obsolete, Browsable(false)]
+        //[Description("If the sample number in the original data is used to generate the timestamp. " +
+        //             "This is useful when you don't have to sync with external data.")]
+        //public bool UseOriginalTimestamp { get; set; } = true;
 
         /// <summary>
         /// Converts message from ZMQInterface Plugin of OpenEphys to OpenEphysData
@@ -203,9 +206,10 @@ namespace PSTH
                     startTimeSet = true;
                 }
 
-                var timeStamp = UseOriginalTimestamp
-                    ? startTime + TimeSpan.FromSeconds((double) sampleNumber / SamplingRate)
-                    : HighResolutionScheduler.Now;
+                //var timeStamp = UseOriginalTimestamp
+                //    ? startTime + TimeSpan.FromSeconds((double) sampleNumber / SamplingRate)
+                //    : HighResolutionScheduler.Now;
+                var timeStamp = startTime + TimeSpan.FromSeconds((double)sampleNumber / SamplingRate);
                 ushort sampleCount;
                 Mat data;
                 switch (type.ToString())
@@ -265,9 +269,7 @@ namespace PSTH
                     default:
                         return default;
                 }
-            }).Where(data => data.Value != null 
-                             && (Type == null || data.Value.Type == Type) 
-                             && (!SortedSpikeOnly || data.Value.SortedId != 0));
+            }).Where(data => data.Value != null);
         }
     }
 }

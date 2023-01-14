@@ -53,8 +53,8 @@ namespace PSTH
     /// in the past when the second sequence emits a notification.
     /// </summary>
     [Combinator]
-    [Description(
-        "Create windows of samples from the first sequence within a certain amount of time in the past (and future) when the second sequence emits a notification.")]
+    [Description("Create windows of samples from the first sequence within a certain amount of time in the past (and future) " +
+                 "when the second sequence emits a notification.")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class WindowBackTrigger
     {
@@ -82,9 +82,9 @@ namespace PSTH
             set => RightHalfWindow = !string.IsNullOrEmpty(value) ? XmlConvert.ToTimeSpan(value) : default;
         }
 
-        private void UpdateQueue<T>(Queue<Timestamped<T>> queue, DateTimeOffset now)
+        private void UpdateQueue<T>(Queue<Timestamped<T>> queue, DateTimeOffset now, TimeSpan tolerance = default)
         {
-            var last = now - LeftHalfWindow - RightHalfWindow;
+            var last = now - LeftHalfWindow - RightHalfWindow - tolerance;
             while (queue.Count > 0 && queue.Peek().Timestamp < last)
                 queue.Dequeue();
         }
@@ -106,12 +106,13 @@ namespace PSTH
             IObservable<Timestamped<TSource>> source, IObservable<Timestamped<TClass>> trigger)
         {
             var queue = new Queue<Timestamped<TSource>>(64);
+            var tolerance = TimeSpan.FromMilliseconds(500);
             return Observable.Create<Triggered<Timestamped<TSource>[], TClass>>(observer =>
             {
                 var sourceSub = source.Subscribe(v =>
                 {
                     queue.Enqueue(v);
-                    UpdateQueue(queue, v.Timestamp);
+                    UpdateQueue(queue, v.Timestamp, tolerance);
                 });
                 var delayedTrigger = trigger.Delay(RightHalfWindow);
                 var triggerSub = trigger

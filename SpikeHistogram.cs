@@ -1,12 +1,11 @@
 ﻿using Bonsai;
+using Bonsai.Dsp;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
 using System.Reactive;
-using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -14,53 +13,41 @@ using System.Runtime.InteropServices;
 using System.Xml;
 using System.Xml.Serialization;
 using OpenCV.Net;
+using Buffer = System.Buffer;
 
 namespace PSTH
 {
     public class Histogram<TClass>
     {
+        public string Unit { get; }
         public int ClassCount { get; private set; }
+        public uint SpikeCount { get; private set; }
         public int BinCount => BinEdges.Length - 1;
-
         public float Min => BinEdges[0];
         public float Max => BinEdges[BinCount];
         public float BinWidth => BinEdges[1] - BinEdges[0];
-        public string Unit { get; }
         public float[] BinEdges { get; }
-        public uint SpikeCount { get; private set; } = 0;
         public float[,] Data { get; private set; }
         public Mat Mat { get; private set; }
 
-        public static bool AddIfDistinct<T>(List<T> list, T item, out int index)
-        {
-            index = list.IndexOf(item);
-            if (index >= 0)
-                return false;
-            index = list.Count;
-            list.Add(item);
-            return true;
-        }
-
-        public Histogram(string unit, int classCount, int binCount, float leftEdge, float rightEdge)
-            : this(unit, classCount == 0 ? null : new float[classCount, binCount], leftEdge, rightEdge)
+        public Histogram(string unit, int classCount, float[] binEdges)
+            : this(unit, (classCount == 0 || binEdges == null) ? null : new float[classCount, binEdges.Length - 1],
+                binEdges)
         {
         }
 
-        private Histogram(string unit, float[,] data, float leftEdge, float rightEdge)
+        private Histogram(string unit, float[,] data, float[] binEdges)
         {
-            if (data == null || leftEdge >= rightEdge)
+            if (data == null || binEdges == null)
                 throw new ArgumentNullException();
             var binCount = data.GetLength(1);
+            if (binEdges.Length != binCount + 1)
+                throw new ArgumentException();
             ClassCount = data.GetLength(0);
             Unit = unit;
             Data = data;
             Mat = Mat.CreateMatHeader(Data);
-            BinEdges = new float[binCount + 1];
-            var binWidth = (rightEdge - leftEdge) / binCount;
-            for (var i = 0; i < binCount + 1; i++)
-            {
-                BinEdges[i] = leftEdge + i * binWidth;
-            }
+            BinEdges = binEdges;
         }
 
         public void AddClass(int classId)
@@ -85,21 +72,48 @@ namespace PSTH
 
         public Histogram<TClass> Clone()
         {
-            return new Histogram<TClass>(Unit, (float[,]) Data.Clone(), Min, Max);
+            return new Histogram<TClass>(Unit, (float[,]) Data.Clone(), BinEdges) {SpikeCount = SpikeCount};
         }
 
-        public Histogram<TClass> Normalized(IReadOnlyList<uint> counts)
+        public Histogram<TClass> Output(IReadOnlyList<uint> counts, float[] kernel)
         {
             if (counts == null || counts.Count != ClassCount)
                 throw new ArgumentException();
+
             var h = Clone();
-            for (var i = 0; i < ClassCount; i++)
+            var halfKernelLength = kernel?.Length / 2 ?? 0;
+
+            if (halfKernelLength == 0)
             {
-                var factor = 1000f / BinWidth / counts[i];
-                for (var j = 0; j < BinCount; j++)
+                for (var i = 0; i < ClassCount; i++)
                 {
-                    h.Data[i, j] *= factor;
+                    var factor = 1000f / BinWidth / counts[i];
+                    for (var j = 0; j < BinCount; j++)
+                    {
+                        h.Data[i, j] *= factor;
+                    }
                 }
+            }
+            else
+            {
+                var result = new float[ClassCount, BinCount];
+                for (var i = 0; i < ClassCount; i++)
+                {
+                    var factor = 1000f / BinWidth / counts[i];
+                    for (var j = 0; j < BinCount; j++)
+                    {
+                        var sum = 0f;
+                        for (var k = 0; k < kernel.Length; k++)
+                        {
+                            var index = j + k - (kernel.Length - 1) / 2;
+                            if (index >= 0 && index < BinCount)
+                                sum += h.Data[i, index] * kernel[k];
+                        }
+                        result[i, j] = sum * factor;
+                    }
+                }
+
+                Buffer.BlockCopy(result, 0, h.Data, 0, ClassCount * BinCount * 4);
             }
 
             return h;
@@ -118,7 +132,11 @@ namespace PSTH
         public uint[] Counts => _counts.ToArray();
         public Histogram<TClass>[] Histograms => _histograms.ToArray();
         public IObservable<Mat> Mats => _histograms.Select(h => h.Mat).ToObservable();
-        //public IObservable<float[,]> Data => Histograms.Select(h => h.Data).ToObservable();
+        public int BinCount => BinEdges.Length - 1;
+        public float Min => BinEdges[0];
+        public float Max => BinEdges[BinCount];
+        public float BinWidth => BinEdges[1] - BinEdges[0];
+        public float[] BinEdges { get; private set; }
 
         private readonly SortedArray<string> _units = new SortedArray<string>(8);
         private readonly SortedArray<TClass> _classes = new SortedArray<TClass>(8);
@@ -130,12 +148,13 @@ namespace PSTH
         }
 
         private HistogramCollection(SortedArray<string> units, SortedArray<TClass> classes,
-            List<uint> counts, List<Histogram<TClass>> histograms)
+            List<uint> counts, List<Histogram<TClass>> histograms, float[] binEdges)
         {
             _units = units;
             _classes = classes;
             _counts = counts;
             _histograms = histograms;
+            BinEdges = binEdges;
         }
 
         public void Reset()
@@ -147,12 +166,22 @@ namespace PSTH
         }
 
         public void AddSamples(Triggered<Timestamped<OpenEphysData>[], TClass> samples, 
-            int binCount, TimeSpan leftHalfWindow, TimeSpan rightHalfWindow)
+            int binCount, float leftEdgeMs, float rightEdgeMs)
         {
             try
             {
-                var leftEdge = (float)-leftHalfWindow.TotalMilliseconds;
-                var rightEdge = (float)rightHalfWindow.TotalMilliseconds;
+                var binWidth = (rightEdgeMs - leftEdgeMs) / binCount;
+
+                if (BinEdges == null || BinEdges.Length == 0 || binCount != BinCount || leftEdgeMs != Min)
+                {
+                    Reset();
+                    BinEdges = new float[binCount + 1];
+                    for (var i = 0; i < binCount + 1; i++)
+                    {
+                        BinEdges[i] = leftEdgeMs + i * binWidth;
+                    }
+                }
+
                 if (_classes.TryAdd(samples.Class, out var classId))
                 {
                     foreach (var hist in _histograms)
@@ -161,6 +190,7 @@ namespace PSTH
                     }
                     _counts.Insert(classId, 0);
                 }
+
                 foreach (var d in samples.Value)
                 {
                     if (d.Value.Type != DataType.Spike) continue;
@@ -168,10 +198,11 @@ namespace PSTH
                     if (_units.TryAdd(unit, out var unitId))
                     {
                         _histograms.Insert(unitId, new Histogram<TClass>(
-                            unit, _classes.Count, binCount, leftEdge, rightEdge));
+                            unit, _classes.Count, BinEdges));
                     }
                     _histograms[unitId].AddSample((float)(d.Timestamp - samples.Timestamp).TotalMilliseconds, classId);
                 }
+
                 _counts[classId]++;
             }
             catch (Exception e)
@@ -181,10 +212,12 @@ namespace PSTH
             }
         }
 
-        public HistogramCollection<TClass> Output()
+        public HistogramCollection<TClass> Output(float[] kernel)
         {
-            var histograms = _histograms.Select(h => h.Normalized(_counts)).ToList();
-            return new HistogramCollection<TClass>(_units, _classes, _counts, histograms);
+            if (_units.Count == 0) return new HistogramCollection<TClass>();
+            var histograms = _histograms.Select(h => h.Output(_counts, kernel)).ToList();
+             return new HistogramCollection<TClass>(_units.Clone(), _classes.Clone(),
+                new List<uint>(_counts), histograms, (float[]) BinEdges.Clone());
         }
 
         public override string ToString()
@@ -194,55 +227,49 @@ namespace PSTH
         }
     }
 
+    /// <summary>
+    /// Represents an operator that calculates PSTH for spikes triggered on signals of different classes.
+    /// </summary>
     [Combinator]
     [Description("SpikeHistogram")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
     public class SpikeHistogram
     {
-        [XmlIgnore]
-        [Description("The width of the negative half window of the histogram")]
-        public TimeSpan LeftHalfWindow
+        /// <summary>
+        /// The width of the negative half window of the histogram in ms.
+        /// </summary>
+        [Description("The width of the negative half window of the histogram in ms.")]
+        public float LeftHalfWindowMs
         {
-            get => _leftHalfWindow;
+            get => _leftHalfWindowMs;
             set
             {
-                if (value == _leftHalfWindow || value < TimeSpan.Zero) return;
-                _leftHalfWindow = value;
+                if (Math.Abs(value - _leftHalfWindowMs) < 0.001f || value < 0) return;
+                _leftHalfWindowMs = value;
                 _binWidthMs = WindowWidthMs / _binCount;
                 Reset();
             }
         }
 
-        [Browsable(false)]
-        [XmlElement(nameof(LeftHalfWindow))]
-        public string LeftHalfWindowXml
+        /// <summary>
+        /// The width of the positive half window of the histogram in ms.
+        /// </summary>
+        [Description("The width of the positive half window of the histogram in ms.")]
+        public float RightHalfWindowMs
         {
-            get => XmlConvert.ToString(LeftHalfWindow);
-            set => LeftHalfWindow = !string.IsNullOrEmpty(value) ? XmlConvert.ToTimeSpan(value) : default;
-        }
-
-        [XmlIgnore]
-        [Description("The width of the positive half window of the histogram")]
-        public TimeSpan RightHalfWindow
-        {
-            get => _rightHalfWindow;
+            get => _rightHalfWindowMs;
             set
             {
-                if (value == _rightHalfWindow || value < TimeSpan.Zero) return;
-                _rightHalfWindow = value;
+                if (Math.Abs(value - _rightHalfWindowMs) < 0.001f || value < 0) return;
+                _rightHalfWindowMs = value;
                 _binWidthMs = WindowWidthMs / _binCount;
                 Reset();
             }
         }
 
-        [Browsable(false)]
-        [XmlElement(nameof(RightHalfWindow))]
-        public string RightHalfWindowXml
-        {
-            get => XmlConvert.ToString(RightHalfWindow);
-            set => RightHalfWindow = !string.IsNullOrEmpty(value) ? XmlConvert.ToTimeSpan(value) : default;
-        }
-
+        /// <summary>
+        /// The number of bins in the histogram.
+        /// </summary>
         [Description("The number of bins in the histogram.")]
         public int BinCount
         {
@@ -256,8 +283,11 @@ namespace PSTH
             }
         }
 
+        /// <summary>
+        /// The width of bins in ms.
+        /// </summary>
         [Description("The width of bins in ms.")]
-        public double BinWidthMs
+        public float BinWidthMs
         {
             get => _binWidthMs;
             set
@@ -269,18 +299,71 @@ namespace PSTH
             }
         }
 
-        public double WindowWidthMs => (_rightHalfWindow + _leftHalfWindow).TotalMilliseconds;
+        /// <summary>
+        /// The sigma of the Gaussian smoothing kernel in ms. 0 means no filtering.
+        /// </summary>
+        [Description("The sigma of the Gaussian smoothing kernel in ms. 0 means no filtering.")]
+        public float FilterSigmaMs
+        {
+            get => _filterSigmaMs;
+            set
+            {
+                if (value < 0) return;
+                _filterSigmaMs = value;
+                Reset();
+            }
+        }
 
-        private TimeSpan _leftHalfWindow = TimeSpan.Zero, _rightHalfWindow = TimeSpan.FromSeconds(1);
-        private int _binCount = 1;
-        private double _binWidthMs = 1000;
+        [Browsable(false)]
+        public float WindowWidthMs => _rightHalfWindowMs + _leftHalfWindowMs;
+
+        private float _leftHalfWindowMs, _rightHalfWindowMs = 1000f, _filterSigmaMs, _binWidthMs = 1f;
+        private int _binCount = 1000;
+        private float[] _kernel;
+        //private Mat _mat;
         private readonly Subject<Unit> _resetSubject = new Subject<Unit>();
+        //private readonly Subject<Mat> _matSubject = new Subject<Mat>();
         private readonly WindowBackTrigger _windowBackTrigger = new WindowBackTrigger();
+        //private readonly FirFilter _filter = new FirFilter();
+        //private readonly IDisposable _filterSub;
+
+        //public SpikeHistogram()
+        //{
+        //    _filterSub = _filter.Process(_matSubject).Subscribe(mat => _mat = mat);
+        //}
+
+        //private Mat Filter(Mat mat)
+        //{
+        //    if (_filterSigmaMs < 0.001) return mat;
+        //    _matSubject.OnNext(mat);
+        //    return _mat.Clone();
+        //}
 
         private void Reset()
         {
-            _windowBackTrigger.LeftHalfWindow = _leftHalfWindow;
-            _windowBackTrigger.RightHalfWindow = _rightHalfWindow;
+            _windowBackTrigger.LeftHalfWindow = TimeSpan.FromMilliseconds(_leftHalfWindowMs);
+            _windowBackTrigger.RightHalfWindow = TimeSpan.FromMilliseconds(_rightHalfWindowMs);
+            var kernelHalfLength = (int)Math.Ceiling(_filterSigmaMs * 4 / _binWidthMs);
+            var kernelLength = kernelHalfLength * 2 + 1;
+            _kernel = new float[kernelLength];
+            var sum = 0f;
+            var q = 2 * _filterSigmaMs * _filterSigmaMs / _binWidthMs / _binWidthMs;
+            
+            for (var i = 0; i < kernelLength; i++)
+            {
+                var j = i - kernelHalfLength;
+                _kernel[i] = (float)Math.Exp(-j * j / q);
+                sum += _kernel[i];
+            }
+            
+            for (var i = 0; i < kernelLength; i++)
+            {
+                _kernel[i] /= sum;
+            }
+
+            //_mat = null;
+            //_filter.Kernel = _kernel;
+            //_filter.Anchor = kernelHalfLength;
             _resetSubject.OnNext(Unit.Default);
         }
 
@@ -297,22 +380,20 @@ namespace PSTH
             IObservable<Timestamped<OpenEphysData>> source, IObservable<Timestamped<TClass>> trigger, 
             IObservable<TReset> reset)
         {
+            Reset();
             var histograms = new HistogramCollection<TClass>();
-            _windowBackTrigger.LeftHalfWindow = _leftHalfWindow;
-            _windowBackTrigger.RightHalfWindow = _rightHalfWindow;
-            _resetSubject.Subscribe(_ => histograms.Reset());
             var triggered = _windowBackTrigger.Process(source, trigger);
             return Observable.Create<HistogramCollection<TClass>>(observer =>
             {
-                var resetSub = reset.Subscribe(_ =>
+                var resetSub = reset.Select(_ => Unit.Default).Merge(_resetSubject).Subscribe(_ =>
                 {
                     histograms.Reset();
-                    observer.OnNext(histograms.Output());
+                    observer.OnNext(histograms.Output(_kernel));
                 });
                 var sourceSub = triggered.Subscribe(samples =>
                 {
-                    histograms.AddSamples(samples, _binCount, _leftHalfWindow, _rightHalfWindow);
-                    observer.OnNext(histograms.Output());
+                    histograms.AddSamples(samples, _binCount, -_leftHalfWindowMs, _rightHalfWindowMs);
+                    observer.OnNext(histograms.Output(_kernel));
                 });
                 return Disposable.Create(() =>
                 {
@@ -345,6 +426,11 @@ namespace PSTH
         //            sourceSub.Dispose();
         //        });
         //    });
+        //}
+
+        //~SpikeHistogram()
+        //{
+        //    _filterSub.Dispose();
         //}
     }
 }
