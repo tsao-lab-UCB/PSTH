@@ -23,7 +23,7 @@ namespace PSTH
     [Combinator]
     [Description("SpikeHistogram")]
     [WorkflowElementCategory(ElementCategory.Combinator)]
-    public class SpikeHistogram : IResettable
+    public class SpikeHistogram
     {
         /// <summary>
         /// The width of the negative half window of the histogram in ms.
@@ -106,6 +106,9 @@ namespace PSTH
             }
         }
 
+        private double LeftHalfBufferMs => _leftHalfWindowMs + _filterSigmaMs * 3;
+        private double RightHalfBufferMs => _rightHalfWindowMs + _filterSigmaMs * 3;
+
         [Browsable(false)]
         public double WindowWidthMs => _rightHalfWindowMs + _leftHalfWindowMs;
 
@@ -117,8 +120,8 @@ namespace PSTH
 
         private void ResetParameters()
         {
-            _windowBackTrigger.LeftHalfWindow = TimeSpan.FromMilliseconds(_leftHalfWindowMs);
-            _windowBackTrigger.RightHalfWindow = TimeSpan.FromMilliseconds(_rightHalfWindowMs);
+            _windowBackTrigger.LeftHalfWindow = TimeSpan.FromMilliseconds(LeftHalfBufferMs);
+            _windowBackTrigger.RightHalfWindow = TimeSpan.FromMilliseconds(RightHalfBufferMs);
             var kernelHalfLength = (int)Math.Ceiling(_filterSigmaMs * 4 / _binWidthMs);
             var kernelLength = kernelHalfLength * 2 + 1;
             _kernel = new double[kernelLength];
@@ -192,7 +195,7 @@ namespace PSTH
 
                 var sourceSub = triggered.Subscribe(samples =>
                 {
-                    histograms.AddSamples(samples, _binCount, -_leftHalfWindowMs, _rightHalfWindowMs);
+                    histograms.AddSamples(samples, _binCount, -LeftHalfBufferMs, RightHalfBufferMs);
                     observer.OnNext(histograms.Output(_kernel));
                 });
                 return Disposable.Create(() =>

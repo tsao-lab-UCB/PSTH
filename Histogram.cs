@@ -10,11 +10,6 @@ using System.Threading.Tasks;
 
 namespace PSTH
 {
-    public interface IResettable
-    {
-        void Reset();
-    }
-
     public readonly struct UnitLabel : IComparable<UnitLabel>, IEquatable<UnitLabel>
     {
         public string Electrode { get; }
@@ -168,7 +163,7 @@ namespace PSTH
         public double Max => BinEdges[BinCount];
         public double BinWidth => BinEdges[1] - BinEdges[0];
         public double[] BinEdges { get; private set; }
-        public IResettable Source { get; }
+        public SpikeHistogram Source { get; }
 
         private readonly SortedArray<UnitLabel> _units = new SortedArray<UnitLabel>(8);
         private readonly SortedArray<TClass> _classes = new SortedArray<TClass>(8);
@@ -176,13 +171,13 @@ namespace PSTH
         private readonly List<Histogram> _histograms = new List<Histogram>(8);
         private readonly object _gate = new object();
 
-        public HistogramList(IResettable source = null)
+        public HistogramList(SpikeHistogram source = null)
         {
             Source = source;
         }
 
         protected HistogramList(SortedArray<UnitLabel> units, SortedArray<TClass> classes,
-            List<uint> counts, List<Histogram> histograms, double[] binEdges, IResettable source = null)
+            List<uint> counts, List<Histogram> histograms, double[] binEdges, SpikeHistogram source = null)
         {
             _units = units;
             _classes = classes;
@@ -296,7 +291,7 @@ namespace PSTH
         }
 
         internal HistogramList(SortedArray<UnitLabel> units, SortedArray<object> classes, List<uint> counts,
-            List<Histogram> histograms, double[] binEdges, Type type, IResettable source = null)
+            List<Histogram> histograms, double[] binEdges, Type type, SpikeHistogram source = null)
             : base(units, classes, counts, histograms, binEdges, source)
         {
             Type = type;

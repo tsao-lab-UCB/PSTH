@@ -24,7 +24,7 @@ namespace PSTH
             new SortedDictionary<string, SortedArray<ushort>>();
         private Label[] _legends;
         private string[] _electrodes;
-        private IResettable _source;
+        private SpikeHistogram _source;
 
         public HistogramListView()
         {
@@ -147,9 +147,14 @@ namespace PSTH
                 foreach (var histogram in histograms)
                 {
                     var electrode = histogram.Unit.Electrode;
-                    var row = Array.BinarySearch(_electrodes, electrode);
+                    var row = Array.IndexOf(_electrodes, electrode);
                     _units[electrode].TryAdd(histogram.Unit.SortedId, out var column);
                     var graph = GetNewGraph(histogram.Unit.ToString());
+                    if (_source != null)
+                    {
+                        graph.XMin = -_source.LeftHalfWindowMs;
+                        graph.XMax = _source.RightHalfWindowMs;
+                    }
                     graph.UpdateTimeSeries(histogram.Data, histogram.BinEdges);
                     _graphs[histogram.Unit] = graph;
                     _tableGraphs.Controls.Add(graph, column, row);
