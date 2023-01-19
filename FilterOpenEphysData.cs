@@ -20,14 +20,22 @@ namespace PSTH
         public DataType Type { get; set; }
 
         /// <summary>
-        /// If unsorted spikes with SortedId = 0 are discarded
+        /// If unsorted spikes with SortedId = 0 are discarded.
         /// </summary>
-        [Description("If unsorted spikes with SortedId = 0 are discarded")]
+        [Description("If unsorted spikes with SortedId = 0 are discarded.")]
         public bool SortedSpikeOnly { get; set; } = false;
+
+        /// <summary>
+        /// State of TTL event (True = HIGH, False = LOW) to keep.
+        /// </summary>
+        [Description("State of TTL event (True = HIGH, False = LOW) to keep.")]
+        public bool? EventState { get; set; }
 
         public IObservable<Timestamped<OpenEphysData>> Process(IObservable<Timestamped<OpenEphysData>> source)
         {
-            return source.Where(input => input.Value.Type == Type && (!SortedSpikeOnly || input.Value.SortedId > 0));
+            return source.Where(input =>
+                input.Value.Type == Type && (!SortedSpikeOnly || input.Value.SortedId > 0) &&
+                (EventState == null || (input.Value.EventState == 0) ^ EventState.Value));
         }
     }
 }

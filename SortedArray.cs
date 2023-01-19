@@ -19,6 +19,11 @@ namespace PSTH
 
         public T this[int index] => _list[index];
 
+        public SortedArray()
+        {
+            _list = new List<T>();
+        }
+
         public SortedArray(int capacity)
         {
             _list = new List<T>(capacity);
@@ -87,6 +92,11 @@ namespace PSTH
         public T[] ToArray()
         {
             return _list.ToArray();
+        }
+
+        public SortedArray<object> Convert()
+        {
+            return new SortedArray<object>(_list.Select(t => (object)t));
         }
 
         public SortedArray<T> Clone()

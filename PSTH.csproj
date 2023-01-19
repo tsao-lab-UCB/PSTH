@@ -14,6 +14,7 @@
     <TargetFramework>net472</TargetFramework>
     <Features>strict</Features>
     <Version>0.1.0</Version>
+    <UseWindowsForms>True</UseWindowsForms>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -22,11 +23,19 @@
 
   <ItemGroup>
     <PackageReference Include="Bonsai.Core" Version="2.7.1" />
+    <PackageReference Include="Bonsai.Design.Visualizers" Version="2.7.0" />
     <PackageReference Include="Bonsai.Dsp" Version="2.7.0" />
     <PackageReference Include="Bonsai.Dsp.Design" Version="2.7.0" />
+    <PackageReference Include="Microsoft.Bcl.HashCode" Version="1.1.1" />
     <PackageReference Include="NetMQ" Version="4.0.1.10" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="OpenCV.Net" Version="3.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization" />
+    <Reference Include="System.Windows.Forms.DataVisualization.Design" />
   </ItemGroup>
 
 </Project>

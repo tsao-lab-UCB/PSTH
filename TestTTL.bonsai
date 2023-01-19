@@ -3,7 +3,6 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:zmq="clr-namespace:Bonsai.ZeroMQ;assembly=Bonsai.ZeroMQ"
                  xmlns:p1="clr-namespace:PSTH;assembly=PSTH"
-                 xmlns:wie="clr-namespace:Bonsai.Windows.Input;assembly=Bonsai.Windows.Input"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
@@ -26,40 +25,29 @@
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="wie:KeyDown">
-          <wie:Filter>NumPad1</wie:Filter>
-          <wie:SuppressRepetitions>false</wie:SuppressRepetitions>
+        <Combinator xsi:type="p1:FilterOpenEphysData">
+          <p1:Type>Event</p1:Type>
+          <p1:SortedSpikeOnly>false</p1:SortedSpikeOnly>
+          <p1:EventState>true</p1:EventState>
         </Combinator>
       </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="wie:KeyDown">
-          <wie:Filter>NumPad2</wie:Filter>
-          <wie:SuppressRepetitions>false</wie:SuppressRepetitions>
-        </Combinator>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Value.EventLine</Selector>
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Timestamp</Selector>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="wie:KeyDown">
-          <wie:Filter>NumPad3</wie:Filter>
-          <wie:SuppressRepetitions>false</wie:SuppressRepetitions>
-        </Combinator>
+        <Combinator xsi:type="rx:Zip" />
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Merge" />
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Timestamp" />
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="wie:KeyDown">
-          <wie:Filter>Space</wie:Filter>
-          <wie:SuppressRepetitions>false</wie:SuppressRepetitions>
-        </Combinator>
+        <Combinator xsi:type="rx:CombineTimestamp" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="p1:SpikeHistogram">
-          <p1:LeftHalfWindowMs>1000</p1:LeftHalfWindowMs>
+          <p1:LeftHalfWindowMs>200</p1:LeftHalfWindowMs>
           <p1:RightHalfWindowMs>1000</p1:RightHalfWindowMs>
-          <p1:BinCount>2000</p1:BinCount>
+          <p1:BinCount>1200</p1:BinCount>
           <p1:BinWidthMs>1</p1:BinWidthMs>
           <p1:FilterSigmaMs>50</p1:FilterSigmaMs>
         </Combinator>
@@ -68,13 +56,14 @@
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
-      <Edge From="2" To="9" Label="Source1" />
-      <Edge From="3" To="6" Label="Source1" />
-      <Edge From="4" To="6" Label="Source2" />
-      <Edge From="5" To="6" Label="Source3" />
+      <Edge From="1" To="3" Label="Source1" />
+      <Edge From="2" To="8" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="3" To="5" Label="Source1" />
+      <Edge From="4" To="6" Label="Source1" />
+      <Edge From="5" To="6" Label="Source2" />
       <Edge From="6" To="7" Label="Source1" />
-      <Edge From="7" To="9" Label="Source2" />
-      <Edge From="8" To="9" Label="Source3" />
+      <Edge From="7" To="8" Label="Source2" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
