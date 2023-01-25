@@ -106,7 +106,7 @@ namespace PSTH
             IObservable<Timestamped<TSource>> source, IObservable<Timestamped<TClass>> trigger)
         {
             var queue = new Queue<Timestamped<TSource>>(64);
-            var tolerance = TimeSpan.FromMilliseconds(500);
+            var tolerance = TimeSpan.FromMilliseconds(2000);
             return Observable.Create<Triggered<Timestamped<TSource>[], TClass>>(observer =>
             {
                 var sourceSub = source.Subscribe(v =>
