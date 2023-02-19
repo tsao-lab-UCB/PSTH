@@ -2,10 +2,14 @@
 
 ## To run debug
 
-- Install Bonsai with relavant packages, including Bonsai.Dsp, Bonsai.Windows.Input, Bonsai.ZeroMQ, OpenCV.Net, Newtonsoft.Json.
-- Install OpenEphys with ZMQInterface. Run OpenEphys on the same computer and add the ZMQInterface to the default FileReader workflow.
-- Open the solution and run in debug mode.
-- Open the Test.bonsai.
+- Install Bonsai.
+- Add the .nupkg file to the Bonsai Gallery (usually located in C:\Users\%Username%\AppData\Local\Bonsai\Gallery).
+- Install the pacakge from the Bonsai "Manage Packages". Choose "Gallery" from "Package source" and check "Include prerelease".
+- Install the latest version of NetMQ from NuGet.
+- Install OpenEphys with Network Events and ZMQ Interface. Replace the ZMQ Interface dll with the updated one from [here](https://github.com/Jialiang-Lu/zmq-interface/releases/).
+- Launch OpenEphys and set up the workflow.
+- Open the TestTTL.bonsai and start.
+- Start the experiment.
 
 ### What's done
 
@@ -23,8 +27,10 @@
 
 - Test.bonsai
     - Example workflow of calculating PSTH triggered on key press (Numpad 1-3). Space can be used to clear the histograms.
+- TestTTL.bonsai
+    - Example workflow of calculating PSTH triggered on parsed PSTH commands according to [this schema](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/23265293/PSTH)
 
 ### To-do list
 
-- Adding another `Publisher` to take information from Kofiko for plotting the legend.
+- Discard trials based on outcomes
 - Triggered LFP
