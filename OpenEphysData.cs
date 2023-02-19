@@ -11,7 +11,8 @@ namespace PSTH
     {
         Continuous,
         Spike,
-        Event
+        Event,
+        Message
     }
 
     public interface IOpenEphysData
@@ -51,7 +52,13 @@ namespace PSTH
         ulong EventWord { get; }
     }
 
-    public class OpenEphysData : IOpenEphysData, IContinuousData, ISpikeData, IEventData
+    public interface IMessageData : IOpenEphysData
+    {
+        byte NodeId { get; }
+        string Message { get; }
+    }
+
+    public class OpenEphysData : IContinuousData, ISpikeData, IEventData, IMessageData
     {
         public DataType Type { get; }
         //public DateTimeOffset TimeStamp { get; }
@@ -69,6 +76,7 @@ namespace PSTH
         public ushort SampleCount { get; }
         public ushort SamplingRate { get; }
         public ushort SortedId { get; }
+        public string Message { get; }
         public Mat Data { get; }
 
         public OpenEphysData(long messageId, long sampleNumber, string stream, ushort channel,
@@ -116,16 +124,30 @@ namespace PSTH
             EventWord = eventWord;
         }
 
+        public OpenEphysData(long messageId, long sampleNumber, string stream, byte nodeId, string message)
+        {
+            Type = DataType.Message;
+            //TimeStamp = timeStamp;
+            MessageId = messageId;
+            SampleNumber = sampleNumber;
+            Stream = stream;
+            NodeId = nodeId;
+            Message = message;
+        }
+
         public override string ToString()
         {
+            var header = $"[{MessageId}@{SampleNumber}]";
             switch (Type)
             {
                 case DataType.Continuous:
-                    return $"[{MessageId}] LFP: channel {Channel}, {SampleCount} samples, {SamplingRate} Hz. ";
+                    return $"{header} LFP: channel {Channel}, {SampleCount} samples, {SamplingRate} Hz. ";
                 case DataType.Spike:
-                    return $"[{MessageId}] Spike: {Electrode}, Id {SortedId}. ";
+                    return $"{header} Spike: {Electrode}, Id {SortedId}. ";
                 case DataType.Event:
-                    return $"[{MessageId}] Event: line {EventLine}, {(EventState > 0 ? "HIGH" : "LOW")}. ";
+                    return $"{header} Event: line {EventLine}, {(EventState > 0 ? "HIGH" : "LOW")}. ";
+                case DataType.Message:
+                    return $"{header} Message: {Message}. ";
                 default:
                     return base.ToString();
             }

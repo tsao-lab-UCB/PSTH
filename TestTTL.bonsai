@@ -4,6 +4,7 @@
                  xmlns:zmq="clr-namespace:Bonsai.ZeroMQ;assembly=Bonsai.ZeroMQ"
                  xmlns:p1="clr-namespace:PSTH;assembly=PSTH"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Workflow>
     <Nodes>
@@ -14,7 +15,7 @@
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="p1:OpenEphysParser">
-          <p1:SamplingRate>40000</p1:SamplingRate>
+          <p1:SamplingRate>30000</p1:SamplingRate>
         </Combinator>
       </Expression>
       <Expression xsi:type="Combinator">
@@ -24,24 +25,39 @@
           <p1:EventState xsi:nil="true" />
         </Combinator>
       </Expression>
+      <Expression xsi:type="Disable">
+        <Builder xsi:type="MemberSelector">
+          <Selector>Value.Electrode</Selector>
+        </Builder>
+      </Expression>
+      <Expression xsi:type="Disable">
+        <Builder xsi:type="MemberSelector">
+          <Selector>Value.SortedId</Selector>
+        </Builder>
+      </Expression>
+      <Expression xsi:type="Disable">
+        <Builder xsi:type="MemberSelector">
+          <Selector>Value.SampleNumber</Selector>
+        </Builder>
+      </Expression>
+      <Expression xsi:type="Disable">
+        <Builder xsi:type="Combinator">
+          <Combinator xsi:type="rx:Zip" />
+        </Builder>
+      </Expression>
+      <Expression xsi:type="Disable">
+        <Builder xsi:type="io:CsvWriter">
+          <io:FileName>C:\Jialiang\Bonsai\test.csv</io:FileName>
+          <io:Append>false</io:Append>
+          <io:Overwrite>true</io:Overwrite>
+          <io:Suffix>None</io:Suffix>
+          <io:IncludeHeader>false</io:IncludeHeader>
+        </Builder>
+      </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:FilterOpenEphysData">
-          <p1:Type>Event</p1:Type>
-          <p1:SortedSpikeOnly>false</p1:SortedSpikeOnly>
-          <p1:EventState>true</p1:EventState>
+        <Combinator xsi:type="p1:TrialEventParser">
+          <p1:FilterOutcome>false</p1:FilterOutcome>
         </Combinator>
-      </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>Value.EventLine</Selector>
-      </Expression>
-      <Expression xsi:type="MemberSelector">
-        <Selector>Timestamp</Selector>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Zip" />
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:CombineTimestamp" />
       </Expression>
       <Expression xsi:type="Combinator">
         <Combinator xsi:type="p1:SpikeHistogram">
@@ -52,18 +68,46 @@
           <p1:FilterSigmaMs>50</p1:FilterSigmaMs>
         </Combinator>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:Timer">
+          <rx:DueTime>PT0S</rx:DueTime>
+          <rx:Period>PT2S</rx:Period>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="StringProperty">
+          <Value>{"application": "PSTH", "uuid": "PSTH", "type": "heartbeat"}</Value>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="rx:WithLatestFrom" />
+      </Expression>
+      <Expression xsi:type="MemberSelector">
+        <Selector>Item2</Selector>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="zmq:Request">
+          <zmq:ConnectionString>tcp://localhost:5557</zmq:ConnectionString>
+        </Combinator>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="1" To="2" Label="Source1" />
-      <Edge From="1" To="3" Label="Source1" />
-      <Edge From="2" To="8" Label="Source1" />
-      <Edge From="3" To="4" Label="Source1" />
-      <Edge From="3" To="5" Label="Source1" />
-      <Edge From="4" To="6" Label="Source1" />
-      <Edge From="5" To="6" Label="Source2" />
+      <Edge From="1" To="8" Label="Source1" />
+      <Edge From="2" To="3" Label="Source1" />
+      <Edge From="2" To="9" Label="Source1" />
+      <Edge From="2" To="4" Label="Source1" />
+      <Edge From="2" To="5" Label="Source1" />
+      <Edge From="3" To="6" Label="Source1" />
+      <Edge From="4" To="6" Label="Source2" />
+      <Edge From="5" To="6" Label="Source3" />
       <Edge From="6" To="7" Label="Source1" />
-      <Edge From="7" To="8" Label="Source2" />
+      <Edge From="8" To="9" Label="Source2" />
+      <Edge From="10" To="12" Label="Source1" />
+      <Edge From="11" To="12" Label="Source2" />
+      <Edge From="12" To="13" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

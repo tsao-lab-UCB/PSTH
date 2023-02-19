@@ -82,6 +82,8 @@ namespace PSTH
             set => RightHalfWindow = !string.IsNullOrEmpty(value) ? XmlConvert.ToTimeSpan(value) : default;
         }
 
+        private readonly object _gate = new object();
+
         private void UpdateQueue<T>(Queue<Timestamped<T>> queue, DateTimeOffset now, TimeSpan tolerance = default)
         {
             var last = now - LeftHalfWindow - RightHalfWindow - tolerance;
@@ -111,19 +113,24 @@ namespace PSTH
             {
                 var sourceSub = source.Subscribe(v =>
                 {
-                    queue.Enqueue(v);
-                    UpdateQueue(queue, v.Timestamp, tolerance);
+                    lock (_gate)
+                    {
+                        queue.Enqueue(v);
+                        UpdateQueue(queue, v.Timestamp, tolerance);
+                    }
                 });
                 var delayedTrigger = trigger.Delay(RightHalfWindow);
                 var triggerSub = trigger
                     .Zip(delayedTrigger, (v1, v2) => (v1, v2))
-                    .Subscribe(v =>
+                    .Subscribe(t =>
                     {
-                        var (v1, v2) = v;
-                        UpdateQueue(queue, v2.Timestamp);
-                        observer.OnNext(
-                            new Triggered<Timestamped<TSource>[], TClass>(queue.ToArray(), v2.Value,
-                                v1.Timestamp));
+                        var (ts, td) = t;
+                        lock (_gate)
+                        {
+                            UpdateQueue(queue, td.Timestamp);
+                            var array = queue.ToArray();
+                            observer.OnNext(new Triggered<Timestamped<TSource>[], TClass>(array, td.Value, ts.Timestamp));
+                        }
                     });
                 return Disposable.Create(() =>
                 {

@@ -68,16 +68,16 @@ namespace PSTH
                     JsonConvert.DeserializeObject<Dictionary<string, object>>(input[1].ConvertToString());
                 if (header == null || !header.TryGetValue("type", out var type))
                     return default;
-                var key = type.ToString() == "spike" ? "spike" : "content";
+                //var key = type.ToString() == "spike" ? "spike" : "content";
                 var content = JsonConvert.DeserializeObject<Dictionary<string, object>>(
-                    header[key].ToString());
+                    header["content"].ToString());
                 if (content == null) return default;
                 var messageId = long.Parse(header["message_num"].ToString());
                 var sampleNumber = long.Parse(content["sample_num"].ToString());
                 var stream = content["stream"].ToString();
                 if (!startTimeSet)
                 {
-                    startTime = DateTimeOffset.Now - TimeSpan.FromSeconds((double) sampleNumber / SamplingRate);
+                    startTime = DateTimeOffset.Now - TimeSpan.FromSeconds((double)sampleNumber / SamplingRate);
                     startTimeSet = true;
                 }
 
@@ -95,12 +95,12 @@ namespace PSTH
                         if (samplingRate != SamplingRate)
                         {
                             SamplingRate = samplingRate;
-                            startTime = DateTimeOffset.Now - TimeSpan.FromSeconds((double) sampleNumber / SamplingRate);
+                            startTime = DateTimeOffset.Now - TimeSpan.FromSeconds((double)sampleNumber / SamplingRate);
                         }
 
                         data = new Mat(1, sampleCount, Depth.F32, 1);
                         Marshal.Copy(input[2].Buffer, 0, data.Data, sampleCount * 4);
-                        timeStamp += TimeSpan.FromSeconds((double) sampleCount / SamplingRate);
+                        timeStamp += TimeSpan.FromSeconds((double)sampleCount / SamplingRate);
                         return new Timestamped<OpenEphysData>(new OpenEphysData(
                             //timeStamp,
                             messageId,
@@ -129,18 +129,31 @@ namespace PSTH
                             data
                         ), timeStamp);
                     case "event":
-                        if (input[2].Buffer.Length != 10) return default;
-                        return new Timestamped<OpenEphysData>(new OpenEphysData(
-                            //timeStamp,
-                            messageId,
-                            sampleNumber,
-                            stream,
-                            byte.Parse(content["source_node"].ToString()),
-                            byte.Parse(content["type"].ToString()),
-                            input[2].Buffer[0],
-                            input[2].Buffer[1],
-                            BitConverter.ToUInt64(input[2].Buffer, 2)
-                        ), timeStamp);
+                        if (content["type"].ToString() == "3")
+                        {
+                            if (input[2].Buffer.Length != 10) return default;
+                            return new Timestamped<OpenEphysData>(new OpenEphysData(
+                                //timeStamp,
+                                messageId,
+                                sampleNumber,
+                                stream,
+                                byte.Parse(content["source_node"].ToString()),
+                                byte.Parse(content["type"].ToString()),
+                                input[2].Buffer[0],
+                                input[2].Buffer[1],
+                                BitConverter.ToUInt64(input[2].Buffer, 2)
+                            ), timeStamp);
+                        }
+                        else
+                        {
+                            return new Timestamped<OpenEphysData>(new OpenEphysData(
+                                messageId,
+                                sampleNumber,
+                                stream,
+                                byte.Parse(content["source_node"].ToString()),
+                                Encoding.UTF8.GetString(input[2].Buffer)
+                            ), timeStamp);
+                        }
                     default:
                         return default;
                 }
